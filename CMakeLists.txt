@@ -525,8 +525,8 @@ endif()
 set(MXNET_INSTALL_TARGETS mxnet)
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin" AND USE_MXNET_LIB_NAMING)
 
-#add_library(mxnet SHARED ${SOURCE})
-add_library(mxnet MODULE ${SOURCE})
+add_library(mxnet SHARED ${SOURCE})
+#add_library(mxnet MODULE ${SOURCE})
 add_library(mxnet_static STATIC ${SOURCE})
 
 else()
