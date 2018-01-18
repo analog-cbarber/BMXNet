@@ -110,23 +110,25 @@ def Qresidual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, 
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn1')
         act1 = mx.sym.QActivation(data=bn1, act_bit=BITA, backward_only=True)
         conv1 = mx.sym.QConvolution(data=act1, num_filter=int(num_filter*0.5), kernel=(1,1), stride=(1,1), pad=(0,0),
-                                      no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITW, cudnn_off=cudnn_off)     
-        
+                                      no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)     
+
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn2')
         act2 = mx.sym.QActivation(data=bn2, act_bit=BITA, backward_only=True)
         conv2 = mx.sym.QConvolution(data=act2, num_filter=int(num_filter*0.5), num_group=num_group, kernel=(3,3), stride=stride, pad=(1,1),
-                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITW, cudnn_off=cudnn_off)
+                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
+        
         bn3 = mx.sym.BatchNorm(data=conv2, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn3')
         act3 = mx.sym.QActivation(data=bn3, act_bit=BITA, backward_only=True)     
         conv3 = mx.sym.QConvolution(data=act3, num_filter=num_filter, kernel=(1,1), stride=(1,1), pad=(0,0), no_bias=True,
-                                   workspace=workspace, name=name + '_conv3', act_bit=BITW, cudnn_off=cudnn_off)
+                                   workspace=workspace, name=name + '_conv3', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
+
         bn4 = mx.sym.BatchNorm(data=conv3, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn4')
 
         if dim_match:
             shortcut = data
         else:
             shortcut_conv = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(1,1), stride=stride, no_bias=True,
-                                            workspace=workspace, name=name+'_sc', act_bit=BITW, cudnn_off=cudnn_off)
+                                            workspace=workspace, name=name+'_sc', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
             shortcut = mx.sym.BatchNorm(data=shortcut_conv, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_sc_bn')
 
         if memonger:
@@ -137,12 +139,12 @@ def Qresidual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, 
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn1')
         act1 = mx.sym.QActivation(data=bn1, act_bit=BITA, backward_only=True)
         conv1 = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(3,3), stride=stride, pad=(1,1),
-                              no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITW, cudnn_off=cudnn_off)
+                              no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
 
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn2')
         act2 = mx.sym.QActivation(data=bn2, act_bit=BITA, backward_only=True)        
         conv2 = mx.sym.QConvolution(data=act2, num_filter=num_filter, kernel=(3,3), stride=(1,1), pad=(1,1),
-                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITW, cudnn_off=cudnn_off)
+                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         
         bn3 = mx.sym.BatchNorm(data=conv2, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn3')
 
@@ -150,7 +152,7 @@ def Qresidual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, 
             shortcut = data
         else:
             shortcut_conv = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(1,1), stride=stride, no_bias=True,
-                                            workspace=workspace, name=name+'_sc', act_bit=BITW, cudnn_off=cudnn_off)
+                                            workspace=workspace, name=name+'_sc', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
             shortcut = mx.sym.BatchNorm(data=shortcut_conv, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_sc_bn')
 
         if memonger:
@@ -193,20 +195,20 @@ def resnext(units, num_stages, filter_list, num_classes, num_group, image_shape,
         body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2,2), pad=(1,1), pool_type='max')
 
     for i in range(num_stages):
-    	if i == None:
-	        body = residual_unit(body, filter_list[i+1], (1 if i==0 else 2, 1 if i==0 else 2), False,
-	                             name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, num_group=num_group, 
-	                             bn_mom=bn_mom, workspace=workspace, memonger=memonger)
-	        for j in range(units[i]-1):
-	            body = residual_unit(body, filter_list[i+1], (1,1), True, name='stage%d_unit%d' % (i + 1, j + 2),
-	                                 bottle_neck=bottle_neck, num_group=num_group, bn_mom=bn_mom, workspace=workspace, memonger=memonger)
-     	else:
-        	body = Qresidual_unit(body, filter_list[i+1], (1 if i==0 else 2, 1 if i==0 else 2), False,
-	                             name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, num_group=num_group, 
-	                             bn_mom=bn_mom, workspace=workspace, memonger=memonger)
-	        for j in range(units[i]-1):
-	            body = Qresidual_unit(body, filter_list[i+1], (1,1), True, name='stage%d_unit%d' % (i + 1, j + 2),
-	                                 bottle_neck=bottle_neck, num_group=num_group, bn_mom=bn_mom, workspace=workspace, memonger=memonger)
+        if i == None:
+            body = residual_unit(body, filter_list[i+1], (1 if i==0 else 2, 1 if i==0 else 2), False,
+                                 name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, num_group=num_group, 
+                                 bn_mom=bn_mom, workspace=workspace, memonger=memonger)
+            for j in range(units[i]-1):
+                body = residual_unit(body, filter_list[i+1], (1,1), True, name='stage%d_unit%d' % (i + 1, j + 2),
+                                     bottle_neck=bottle_neck, num_group=num_group, bn_mom=bn_mom, workspace=workspace, memonger=memonger)
+        else:
+            body = Qresidual_unit(body, filter_list[i+1], (1 if i==0 else 2, 1 if i==0 else 2), False,
+                                 name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, num_group=num_group, 
+                                 bn_mom=bn_mom, workspace=workspace, memonger=memonger)
+            for j in range(units[i]-1):
+                body = Qresidual_unit(body, filter_list[i+1], (1,1), True, name='stage%d_unit%d' % (i + 1, j + 2),
+                                     bottle_neck=bottle_neck, num_group=num_group, bn_mom=bn_mom, workspace=workspace, memonger=memonger)
             
     pool1 = mx.symbol.Pooling(data=body, global_pool=True, kernel=(7, 7), pool_type='avg', name='pool1')
     flat = mx.symbol.Flatten(data=pool1)
@@ -219,6 +221,7 @@ def get_symbol(num_classes, num_layers, image_shape, num_group=32, conv_workspac
     Original author Wei Wu
     """
     global BITW, BITA
+
     BITW = bits_w
     BITA = bits_a
 
@@ -238,12 +241,17 @@ def get_symbol(num_classes, num_layers, image_shape, num_group=32, conv_workspac
             raise ValueError("no experiments done on num_layers {}, you can do it youself".format(num_layers))
         units = per_unit * num_stages
     else:
+        #if num_layers >= 50:
+        #    filter_list = [64, 256, 512, 1024, 2048]
+        #    bottle_neck = True
+        #else:
+        #    filter_list = [64, 64, 128, 256, 512]
+        #    bottle_neck = False
+        bottle_neck = False # bottle neck design will significantly decrease the bnn accuracy
         if num_layers >= 50:
-            filter_list = [64, 256, 512, 1024, 2048]
-            bottle_neck = True
+            filter_list = [64, 128, 256, 512, 1024]
         else:
             filter_list = [64, 64, 128, 256, 512]
-            bottle_neck = False
         num_stages = 4
         if num_layers == 18:
             units = [2, 2, 2, 2]
