@@ -8,9 +8,9 @@ import mxnet as mx
 
 
 def add_binary_args(parser):
-    parser.add_argument('--bit-w', type=int, default=1,
+    parser.add_argument('--bits-w', type=int, default=1,
                        help='number of bits for weights')
-    parser.add_argument('--bit-a', type=int, default=1,
+    parser.add_argument('--bits-a', type=int, default=1,
                        help='number of bits for activations')
 
 
@@ -37,10 +37,6 @@ if __name__ == '__main__':
         # network
         network        = 'resnet',
         num_layers     = 18,
-
-        # only for binarized models
-        bit_w = 1,
-        bit_a = 1,
 
         # data
         num_classes      = 1000,

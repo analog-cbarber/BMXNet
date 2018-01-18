@@ -102,20 +102,20 @@ def Qresidual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, 
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn1')
         act1 = mx.sym.QActivation(data=bn1, act_bit=BITA, backward_only=True)
         conv1 = mx.sym.QConvolution(data=act1, num_filter=int(num_filter*0.25), kernel=(1,1), stride=(1,1), pad=(0,0),
-                                   no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITW, cudnn_off=cudnn_off)
+                                   no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn2')
         act2 = mx.sym.QActivation(data=bn2,  act_bit=BITA, backward_only=True)
         conv2 = mx.sym.QConvolution(data=act2, num_filter=int(num_filter*0.25), kernel=(3,3), stride=stride, pad=(1,1),
-                                   no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITW, cudnn_off=cudnn_off)
+                                   no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         bn3 = mx.sym.BatchNorm(data=conv2, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn3')
         act3 = mx.sym.QActivation(data=bn3, act_bit=BITA, backward_only=True)
         conv3 = mx.sym.QConvolution(data=act3, num_filter=num_filter, kernel=(1,1), stride=(1,1), pad=(0,0), no_bias=True,
-                                   workspace=workspace, name=name + '_conv3', act_bit=BITW, cudnn_off=cudnn_off)
+                                   workspace=workspace, name=name + '_conv3', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         if dim_match:
             shortcut = data
         else:
             shortcut = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(1,1), stride=stride, no_bias=True,
-                                            workspace=workspace, name=name+'_sc', act_bit=BITW, cudnn_off=cudnn_off)
+                                            workspace=workspace, name=name+'_sc', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         if memonger:
             shortcut._set_attr(mirror_stage='True')
         return conv3 + shortcut
@@ -123,16 +123,16 @@ def Qresidual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, 
         bn1 = mx.sym.BatchNorm(data=data, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn1')
         act1 = mx.sym.QActivation(data=bn1, act_bit=BITA, backward_only=True)
         conv1 = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(3,3), stride=stride, pad=(1,1),
-                                      no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITW, cudnn_off=cudnn_off)
+                                      no_bias=True, workspace=workspace, name=name + '_conv1', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         bn2 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, momentum=bn_mom, eps=2e-5, name=name + '_bn2')
         act2 = mx.sym.QActivation(data=bn2, act_bit=BITA, backward_only=True)
         conv2 = mx.sym.QConvolution(data=act2, num_filter=num_filter, kernel=(3,3), stride=(1,1), pad=(1,1),
-                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITW, cudnn_off=cudnn_off)
+                                      no_bias=True, workspace=workspace, name=name + '_conv2', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         if dim_match:
             shortcut = data
         else:
             shortcut = mx.sym.QConvolution(data=act1, num_filter=num_filter, kernel=(1,1), stride=stride, no_bias=True,
-                         workspace=workspace, name=name+'_sc', act_bit=BITW, cudnn_off=cudnn_off)
+                         workspace=workspace, name=name+'_sc', act_bit=BITA, weight_bit=BITW, cudnn_off=cudnn_off)
         if memonger:
             shortcut._set_attr(mirror_stage='True')
         return conv2 + shortcut
@@ -218,12 +218,19 @@ def get_symbol(num_classes, num_layers, image_shape, conv_workspace=256, bits_w=
             raise ValueError("no experiments done on num_layers {}, you can do it youself".format(num_layers))
         units = per_unit * num_stages
     else:
+        # bottle neck design significantly degrade the accuracy on bnn
+        bottle_neck = False
         if num_layers >= 50:
-            filter_list = [64, 256, 512, 1024, 2048]
-            bottle_neck = True
+            filter_list = [64, 128, 256, 512, 1024]
         else:
             filter_list = [64, 64, 128, 256, 512]
-            bottle_neck = False
+        #if num_layers >= 50:
+        #    filter_list = [64, 256, 512, 1024, 2048]
+        #    bottle_neck = False
+        #else:
+        #    filter_list = [64, 64, 128, 256, 512]
+        #    bottle_neck = False
+
         num_stages = 4
         if num_layers == 18:
             units = [2, 2, 2, 2]
