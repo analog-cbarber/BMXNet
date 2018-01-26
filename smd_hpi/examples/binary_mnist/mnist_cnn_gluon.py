@@ -21,7 +21,7 @@ BITA = 1
 logging.getLogger().setLevel(logging.INFO)
 
 class LeNet(HybridBlock):
-    def __init__(self, binary=True):
+    def __init__(self, binary=True, act_bit=1, weight_bit=1):
         super(LeNet, self).__init__(prefix='LeNet_')
         self.binary = binary
 
@@ -36,9 +36,8 @@ class LeNet(HybridBlock):
 
             # second conv layer
             if binary:
-                layers.add(
-                    QActivation(act_bit=BITA, backward_only=True),
-                    QConv2D(channels=64, kernel_size=5, act_bit=BITW, use_bias=False))
+                layers.add(QConv2D(channels=64, kernel_size=5,
+                                   act_bit=act_bit, weight_bit=weight_bit))
             else:
                 layers.add(Conv2D(channels=64, kernel_size=5, use_bias=False))
 
@@ -48,10 +47,7 @@ class LeNet(HybridBlock):
 
             # first fully connected layer
             if binary:
-                layers.add(
-                    Flatten(),
-                    QActivation(act_bit=BITA, backward_only=True),
-                    QDense(1000, act_bit=BITW, use_bias=False))
+                layers.add(QDense(1000, act_bit=act_bit, weight_bit=weight_bit))
             else:
                 layers.add(Dense(1000, use_bias=False))
 
@@ -62,7 +58,7 @@ class LeNet(HybridBlock):
             # second fully connected layer
             layers.add(Dense(10))
 
-    def hybrid_forward(self, F, data, labels):
+    def hybrid_forward(self, F, data, labels, **kwargs):
         out = self._layers(data)
         return F.SoftmaxOutput(data=out, label=labels)
 
@@ -155,7 +151,7 @@ def main(args):
             test_mnist(model, batch_size=args.batch_size)
 
         else:
-            model = LeNet(binary=args.binary)
+            model = LeNet(binary=args.binary, act_bit=args.act_bit, weight_bit=args.weight_bit)
 
             train_mnist(model,
                         debug=args.debug,
@@ -178,6 +174,10 @@ if __name__ == "__main__":
                         help='# of epochs of training or epoch params to use for prediction')
     parser.add_argument('-B', '--batch-size', type=int, default=200, help='set the batch size')
     parser.add_argument('--debug', action='store_true', help='Debug mode - use imperative api')
+    parser.add_argument('--bits-w', dest='weight_bit', type=int, default=BITW,
+                       help='number of bits for weights')
+    parser.add_argument('--bits-a', dest='act_bit', type=int, default=BITA,
+                       help='number of bits for activations')
 
     args = parser.parse_args()
     main(args)
